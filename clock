@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3-7반 시간표 및 일정</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#eff6ff', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col items-center">
+
+    <!-- 모바일 최적화 메인 컨테이너 -->
+    <div class="w-full max-w-md bg-white min-h-screen shadow-lg flex flex-col">
+        
+        <!-- 상단 헤더 -->
+        <header class="bg-blue-600 text-white px-5 py-4 flex justify-between items-center sticky top-0 z-20 shadow-md">
+            <div>
+                <h1 class="text-lg font-bold">3-7반 스마트 시간표</h1>
+                <p id="current-date-str" class="text-xs text-blue-100 mt-0.5">로딩 중...</p>
+            </div>
+            <button onclick="toggleAllTable()" id="toggle-btn" class="bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                전체 시간표 보기
+            </button>
+        </header>
+
+        <!-- 메인 컨텐츠 영역 -->
+        <main class="flex-1 p-4 space-y-5 pb-10">
+
+            <!-- 실시간 교시 / 진행바 카드 -->
+            <section class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-4 shadow-sm">
+                <div class="flex justify-between items-center mb-2">
+                    <span id="period-badge" class="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">수업 분석 중</span>
+                    <span id="period-time-range" class="text-xs font-semibold text-gray-500">--:-- ~ --:--</span>
+                </div>
+                
+                <div class="my-3">
+                    <div class="flex justify-between items-baseline">
+                        <h2 id="current-subject" class="text-xl font-black text-gray-900">-</h2>
+                        <span id="time-remaining" class="text-sm font-bold text-blue-600">--분 전</span>
+                    </div>
+                    <p id="current-room" class="text-xs text-gray-500 mt-0.5">-</p>
+                </div>
+
+                <!-- 진행바 -->
+                <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden mb-3">
+                    <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+
+                <!-- 다음 교시 미리보기 -->
+                <div class="bg-white/80 rounded-xl p-2.5 flex items-center justify-between border border-blue-100/60 text-xs">
+                    <span class="text-gray-500 font-medium">다음 교시</span>
+                    <span id="next-subject-info" class="font-bold text-gray-800">-</span>
+                </div>
+            </section>
+
+            <!--오늘 시간표 / 전체 시간표 뷰 영역 -->
+            <section>
+                <div class="flex justify-between items-center mb-3">
+                    <h3 id="section-title" class="font-bold text-gray-800 text-base">오늘의 시간표</h3>
+                    <div class="flex space-x-1" id="day-selector-container">
+                        <!-- 요일 선택 탭 (전체보기 아닐 때 활성화) -->
+                        <span id="today-badge-indicator" class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-md font-medium">실시간 연동</span>
+                    </div>
+                </div>
+
+                <!-- 오늘 시간표 리스트 뷰 -->
+                <div id="today-timetable-view" class="space-y-2">
+                    <!-- JS로 동적 생성 -->
+                </div>
+
+                <!-- 전체 시간표 테이블 뷰 (초기엔 숨김) -->
+                <div id="full-timetable-view" class="hidden overflow-x-auto border border-gray-200 rounded-xl shadow-sm bg-white">
+                    <table class="w-full text-xs text-center border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-700 border-b border-gray-200">
+                                <th class="p-2 border-r border-gray-200 font-semibold">교시</th>
+                                <th class="p-2 border-r border-gray-200 font-semibold">월</th>
+                                <th class="p-2 border-r border-gray-200 font-semibold">화</th>
+                                <th class="p-2 border-r border-gray-200 font-semibold">수</th>
+                                <th class="p-2 border-r border-gray-200 font-semibold">목</th>
+                                <th class="p-2 font-semibold">금</th>
+                            </tr>
+                        </thead>
+                        <tbody id="full-table-body">
+                            <!-- JS 동적 생성 -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 내 일정 등록 섹션 -->
+            <section class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-gray-800 text-base">📝 내 일정 관리</h3>
+                    <span class="text-[10px] text-gray-400">주 단위 자동 초기화</span>
+                </div>
+
+                <!-- 일정 입력 폼 -->
+                <form id="schedule-form" onsubmit="addSchedule(event)" class="space-y-2 mb-4">
+                    <div class="grid grid-cols-3 gap-2">
+                        <select id="schedule-day" class="text-xs border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                            <option value="월">월요일</option>
+                            <option value="화">화요일</option>
+                            <option value="수">수요일</option>
+                            <option value="목">목요일</option>
+                            <option value="금">금요일</option>
+                        </select>
+                        <input type="text" id="schedule-time" placeholder="시간 (예: 16:30)" required class="text-xs border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none col-span-2">
+                    </div>
+                    <input type="text" id="schedule-content" placeholder="일정 내용을 입력하세요 (예: 수학 과제 제출)" required class="w-full text-xs border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 rounded-lg transition shadow-sm">
+                        일정 추가하기
+                    </button>
+                </form>
+
+                <!-- 등록된 일정 리스트 -->
+                <div id="schedule-list" class="space-y-2">
+                    <!-- JS 동적 생성 -->
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- JavaScript 로직 -->
+    <script>
+        // 시간표 데이터 (쌤 이름 제외, 과목/반/이동반 정보 포함)
+        const timetableData = {
+            1: [ // 월
+                { period: 1, time: "8:40~9:30", subject: "공체", classCode: "", room: "본반 교실" },
+                { period: 2, time: "9:40~10:30", subject: "영문", classCode: "3B", room: "이동: 3-9" },
+                { period: 3, time: "10:40~11:30", subject: "D 고윤", classCode: "3D고윤", room: "이동: 3-7" },
+                { period: 4, time: "11:40~12:30", subject: "수과탐", classCode: "", room: "본반 교실" },
+                { period: 5, time: "13:35~14:25", subject: "사문탐", classCode: "3E2사문탐", room: "이동: 3-8" },
+                { period: 6, time: "14:35~15:25", subject: "고전", classCode: "", room: "본반 교실" },
+                { period: 7, time: "15:40~16:30", subject: "수능이후", classCode: "오후수업", room: "본반 교실" }
+            ],
+            2: [ // 화
+                { period: 1, time: "8:40~9:30", subject: "중국", classCode: "3A", room: "이동: 3-9" },
+                { period: 2, time: "9:40~10:30", subject: "진영", classCode: "", room: "본반 교실" },
+                { period: 3, time: "10:40~11:30", subject: "여지", classCode: "3C2", room: "이동: 3-2" },
+                { period: 4, time: "11:40~12:30", subject: "영문", classCode: "3B", room: "이동: 3-9" },
+                { period: 5, time: "13:35~14:25", subject: "창진", classCode: "", room: "본반 교실" },
+                { period: 6, time: "14:35~15:25", subject: "수능이후", classCode: "오후수업", room: "본반 교실" },
+                { period: 7, time: "15:40~16:30", subject: "수능이후", classCode: "오후수업", room: "본반 교실" }
+            ],
+            3: [ // 수
+                { period: 1, time: "8:40~9:30", subject: "여지", classCode: "3C2", room: "이동: 3-2" },
+                { period: 2, time: "9:40~10:30", subject: "수과탐", classCode: "", room: "본반 교실" },
+                { period: 3, time: "10:40~11:30", subject: "중국", classCode: "3A", room: "이동: 3-9" },
+                { period: 4, time: "11:40~12:30", subject: "D 고윤", classCode: "3D고윤", room: "이동: 3-7" },
+                { period: 5, time: "13:35~14:25", subject: "윤건", classCode: "", room: "본반 교실" },
+                { period: 6, time: "14:35~15:25", subject: "창체", classCode: "", room: "본반 교실" },
+                { period: 7, time: null, subject: "-", classCode: "", room: "-" }
+            ],
+            4: [ // 목
+                { period: 1, time: "8:40~9:30", subject: "고전", classCode: "", room: "본반 교실" },
+                { period: 2, time: "9:40~10:30", subject: "영문", classCode: "3B", room: "이동: 3-9" },
+                { period: 3, time: "10:40~11:30", subject: "D 고윤", classCode: "3D고윤", room: "이동: 3-7" },
+                { period: 4, time: "11:40~12:30", subject: "진영", classCode: "", room: "본반 교실" },
+                { period: 5, time: "13:35~14:25", subject: "사문탐", classCode: "3E2사문탐", room: "이동: 3-8" },
+                { period: 6, time: "14:35~15:25", subject: "윤건", classCode: "", room: "본반 교실" },
+                { period: 7, time: null, subject: "-", classCode: "", room: "-" }
+            ],
+            5: [ // 금
+                { period: 1, time: "8:40~9:30", subject: "사문탐", classCode: "3E2사문탐", room: "이동: 3-8" },
+                { period: 2, time: "9:40~10:30", subject: "고전", classCode: "", room: "본반 교실" },
+                { period: 3, time: "10:40~11:30", subject: "여지", classCode: "3C2", room: "이동: 3-2" },
+                { period: 4, time: "11:40~12:30", subject: "중국", classCode: "3A", room: "이동: 3-9" },
+                { period: 5, time: "13:35~14:25", subject: "수과탐", classCode: "", room: "본반 교실" },
+                { period: 6, time: "14:35~15:25", subject: "진영", classCode: "", room: "본반 교실" },
+                { period: 7, time: "15:40~16:30", subject: "수능이후", classCode: "오후수업", room: "본반 교실" }
+            ]
+        };
+
+        // 교시별 시간 매핑 (분 단위 계산용)
+        const periodSlots = [
+            { period: 0, name: "조례/등교", start: "08:30", end: "08:40" },
+            { period: 1, name: "1교시", start: "08:40", end: "09:30" },
+            { period: 2, name: "2교시", start: "09:40", end: "10:30" },
+            { period: 3, name: "3교시", start: "10:40", end: "11:30" },
+            { period: 4, name: "4교시", start: "11:40", end: "12:30" },
+            { period: "lunch", name: "중식 시간", start: "12:30", end: "13:35" },
+            { period: 5, name: "5교시", start: "13:35", end: "14:25" },
+            { period: 6, name: "6교시", start: "14:35", end: "15:25" },
+            { period: "clean", name: "청소 시간", start: "15:25", end: "15:40" },
+            { period: 7, name: "7교시", start: "15:40", end: "16:30" }
+        ];
+
+        let isFullTableView = false;
+
+        // 시간 문자열을 분으로 변환
+        function timeToMinutes(timeStr) {
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
+        }
+
+        // 주차(Week) 계산 함수 (주가 지나면 자동 초기화용)
+        function getWeekNumber(d) {
+            d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+            d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+            var yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+            var weekNo = Math.ceil(( ( (d - yearStart) / 86400000) + 1)/7);
+            return `${d.getUTCFullYear()}-W${weekNo}`;
+        }
+
+        // 앱 초기화 및 주기적 갱신
+        function initApp() {
+            checkAndResetSchedules();
+            updateDashboard();
+            renderTodayTimetable();
+            renderFullTimetable();
+            renderSchedules();
+            setInterval(updateDashboard, 1000); // 1초마다 실시간 업데이트
+        }
+
+        // 일정 주간 초기화 체크
+        function checkAndResetSchedules() {
+            const currentWeek = getWeekNumber(new Date());
+            const savedWeek = localStorage.getItem('timetable_saved_week');
+            if (savedWeek !== currentWeek) {
+                localStorage.setItem('timetable_schedules', JSON.stringify([]));
+                localStorage.setItem('timetable_saved_week', currentWeek);
+            }
+        }
+
+        // 실시간 대시보드 및 진행바 업데이트
+        function updateDashboard() {
+            const now = new Date();
+            const daysMap = ['일', '월', '화', '수', '목', '금', '토'];
+            const dayIdx = now.getDay(); // 1:월 ~ 5:금
+            const dateString = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 (${daysMap[dayIdx]})`;
+            document.getElementById('current-date-str').innerText = dateString;
+
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+            const currentSeconds = now.getSeconds();
+            
+            let currentStatusName = "일과 시간 외";
+            let currentSubText = "오늘의 수업이 종료되었습니다.";
+            let currentRoomText = "";
+            let timeRangeText = "학교 안심 시간";
+            let progressPercent = 0;
+            let remainingText = "";
+            let nextSubName = "없음";
+
+            // 주말이거나 방학 등 요일이 아닐 때
+            if (dayIdx === 0 || dayIdx === 6) {
+                document.getElementById('period-badge').innerText = "주말 / 휴일";
+                document.getElementById('period-time-range').innerText = "주말입니다";
+                document.getElementById('current-subject').innerText = "즐거운 주말 보내세요!";
+                document.getElementById('current-room').innerText = "";
+                document.getElementById('time-remaining').innerText = "휴식 중";
+                document.getElementById('progress-bar').style.width = "0%";
+                document.getElementById('next-subject-info').innerText = "주말";
+                return;
+            }
+
+            const daySchedule = timetableData[dayIdx] || [];
+            let activePeriodObj = null;
+            let nextPeriodObj = null;
+
+            for (let i = 0; i < periodSlots.length; i++) {
+                const slot = periodSlots[i];
+                const startMin = timeToMinutes(slot.start);
+                const endMin = timeToMinutes(slot.end);
+
+                if (currentMinutes >= startMin && currentMinutes < endMin) {
+                    activePeriodObj = slot;
+                    // 다음 수업/활동 찾기
+                    if (i + 1 < periodSlots.length) {
+                        nextPeriodObj = periodSlots[i + 1];
+                    }
+                    break;
+                }
+            }
+
+            if (activePeriodObj) {
+                const startMin = timeToMinutes(activePeriodObj.start);
+                const endMin = timeToMinutes(activePeriodObj.end);
+                const totalDuration = endMin - startMin;
+                const elapsed = currentMinutes - startMin + (currentSeconds / 60);
+                progressPercent = Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100);
+                
+                const remainSecs = (endMin * 60) - (currentMinutes * 60 + currentSeconds);
+                const remMin = Math.floor(remainSecs / 60);
+                const remSec = remainSecs % 60;
+                remainingText = `${remMin}분 ${remSec}초 전`;
+                timeRangeText = `${activePeriodObj.start} ~ ${activePeriodObj.end}`;
+
+                if (typeof activePeriodObj.period === 'number') {
+                    const foundClass = daySchedule.find(s => s.period === activePeriodObj.period);
+                    document.getElementById('period-badge').innerText = `${activePeriodObj.period}교시 진행 중`;
+                    if (foundClass) {
+                        document.getElementById('current-subject').innerText = foundClass.subject + (foundClass.classCode ? ` (${foundClass.classCode})` : '');
+                        document.getElementById('current-room').innerText = `📍 ${foundClass.room}`;
+                    } else {
+                        document.getElementById('current-subject').innerText = "수업 없음";
+                        document.getElementById('current-room').innerText = "";
+                    }
+                } else {
+                    document.getElementById('period-badge').innerText = activePeriodObj.name;
+                    document.getElementById('current-subject').innerText = activePeriodObj.name;
+                    document.getElementById('current-room').innerText = "휴식 및 재충전 시간";
+                }
+            } else {
+                // 수업 시간이 아닐 때 (등교 전 혹은 하교 후)
+                if (currentMinutes < timeToMinutes("08:30")) {
+                    document.getElementById('period-badge').innerText = "등교 전";
+                    document.getElementById('current-subject').innerText = "등교 준비 시간";
+                    document.getElementById('current-room').innerText = "오늘 하루도 화이팅!";
+                } else {
+                    document.getElementById('period-badge').innerText = "방과 후 / 하교";
+                    document.getElementById('current-subject').innerText = "오늘 일정 종료";
+                    document.getElementById('current-room').innerText = "수고하셨습니다!";
+                }
+                progressPercent = 100;
+                remainingText = "종료";
+            }
+
+            // 다음 교시 정보 설정
+            if (nextPeriodObj) {
+                if (typeof nextPeriodObj.period === 'number') {
+                    const nextClass = daySchedule.find(s => s.period === nextPeriodObj.period);
+                    document.getElementById('next-subject-info').innerText = nextClass ? `${nextPeriodObj.period}교시: ${nextClass.subject} (${nextClass.room})` : `${nextPeriodObj.period}교시`;
+                } else {
+                    document.getElementById('next-subject-info').innerText = nextPeriodObj.name;
+                }
+            } else {
+                document.getElementById('next-subject-info').innerText = "없음 (일정 완료)";
+            }
+
+            document.getElementById('period-time-range').innerText = timeRangeText;
+            document.getElementById('time-remaining').innerText = remainingText;
+            document.getElementById('progress-bar').style.width = `${progressPercent}%`;
+        }
+
+        // 오늘의 시간표 렌더링
+        function renderTodayTimetable() {
+            const container = document.getElementById('today-timetable-view');
+            container.innerHTML = '';
+            
+            const now = new Date();
+            let dayIdx = now.getDay();
+            if (dayIdx === 0 || dayIdx === 6) dayIdx = 1; // 주말일 경우 월요일 기준으로 미리보기 제공
+
+            const daySchedule = timetableData[dayIdx] || [];
+
+            daySchedule.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "flex items-center justify-between p-3 bg-gray-50 hover:bg-blue-50/50 rounded-xl border border-gray-100 transition";
+                
+                card.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <span class="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center">${item.period}</span>
+                        <div>
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-bold text-gray-800 text-sm">${item.subject}</span>
+                                ${item.classCode ? `<span class="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-semibold">${item.classCode}</span>` : ''}
+                            </div>
+                            <span class="text-[11px] text-gray-400">${item.time || ''}</span>
+                        </div>
+                    </div>
+                    <span class="text-xs font-medium text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-200">${item.room}</span>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // 전체 시간표 테이블 렌더링
+        function renderFullTimetable() {
+            const tbody = document.getElementById('full-table-body');
+            tbody.innerHTML = '';
+
+            for (let p = 1; p <= 7; p++) {
+                const row = document.createElement('tr');
+                row.className = "border-b border-gray-100";
+                
+                let rowHtml = `<td class="p-2 bg-gray-50 font-bold text-gray-600 border-r border-gray-100">${p}교시</td>`;
+                
+                // 월(1) ~ 금(5)
+                for (let d = 1; d <= 5; d++) {
+                    const dayClasses = timetableData[d];
+                    const cls = dayClasses.find(c => c.period === p);
+                    
+                    if (cls && cls.subject !== "-") {
+                        rowHtml += `
+                            <td class="p-2 border-r border-gray-100">
+                                <div class="font-bold text-gray-800">${cls.subject}</div>
+                                ${cls.classCode ? `<div class="text-[10px] text-indigo-600">${cls.classCode}</div>` : ''}
+                                <div class="text-[9px] text-gray-400">${cls.room}</div>
+                            </td>
+                        `;
+                    } else {
+                        rowHtml += `<td class="p-2 border-r border-gray-100 text-gray-300">-</td>`;
+                    }
+                }
+                row.innerHTML = rowHtml;
+                tbody.appendChild(row);
+            }
+        }
+
+        // 전체 시간표 / 오늘 시간표 토글 기능
+        function toggleAllTable() {
+            isFullTableView = !isFullTableView;
+            const todayView = document.getElementById('today-timetable-view');
+            const fullView = document.getElementById('full-timetable-view');
+            const sectionTitle = document.getElementById('section-title');
+            const toggleBtn = document.getElementById('toggle-btn');
+            const badge = document.getElementById('today-badge-indicator');
+
+            if (isFullTableView) {
+                todayView.classList.add('hidden');
+                fullView.classList.remove('hidden');
+                sectionTitle.innerText = "주간 전체 시간표";
+                toggleBtn.innerText = "오늘 시간표 보기";
+                badge.style.display = 'none';
+            } else {
+                todayView.classList.remove('hidden');
+                fullView.classList.add('hidden');
+                sectionTitle.innerText = "오늘의 시간표";
+                toggleBtn.innerText = "전체 시간표 보기";
+                badge.style.display = 'inline-block';
+            }
+        }
+
+        // 일정 추가 기능
+        function addSchedule(e) {
+            e.preventDefault();
+            const day = document.getElementById('schedule-day').value;
+            const time = document.getElementById('schedule-time').value;
+            const content = document.getElementById('schedule-content').value;
+
+            const schedules = JSON.parse(localStorage.getItem('timetable_schedules') || '[]');
+            schedules.push({ id: Date.now(), day, time, content });
+            localStorage.setItem('timetable_schedules', JSON.stringify(schedules));
+
+            document.getElementById('schedule-time').value = '';
+            document.getElementById('schedule-content').value = '';
+            renderSchedules();
+        }
+
+        // 일정 삭제 기능
+        function deleteSchedule(id) {
+            let schedules = JSON.parse(localStorage.getItem('timetable_schedules') || '[]');
+            schedules = schedules.filter(s => s.id !== id);
+            localStorage.setItem('timetable_schedules', JSON.stringify(schedules));
+            renderSchedules();
+        }
+
+        // 일정 렌더링
+        function renderSchedules() {
+            const listContainer = document.getElementById('schedule-list');
+            const schedules = JSON.parse(localStorage.getItem('timetable_schedules') || '[]');
+            
+            listContainer.innerHTML = '';
+
+            if (schedules.length === 0) {
+                listContainer.innerHTML = `<p class="text-xs text-gray-400 text-center py-2">등록된 개인 일정이 없습니다.</p>`;
+                return;
+            }
+
+            schedules.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100 text-xs";
+                card.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <span class="bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded">${item.day}</span>
+                        <span class="text-gray-500 font-medium">${item.time}</span>
+                        <span class="text-gray-800 font-semibold">${item.content}</span>
+                    </div>
+                    <button onclick="deleteSchedule(${item.id})" class="text-red-400 hover:text-red-600 font-bold px-1.5 py-0.5">✕</button>
+                `;
+                listContainer.appendChild(card);
+            });
+        }
+
+        // 앱 시작
+        window.onload = initApp;
+    </script>
+</body>
+</html>
